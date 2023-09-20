@@ -1,0 +1,271 @@
+# Heart disease classification using machine learning
+
+#### The dataset used for this project is available on Kaggle. https://www.kaggle.com/ronitf/heart-disease-uci
+#### Data contains;
+
+1.age
+<br>
+2.sex
+<br>
+3.chest pain type (4 values)
+<br>
+4.resting blood pressure
+<br>
+5.serum cholestoral in mg/dl
+<br>
+6.fasting blood sugar > 120 mg/dl
+<br>
+7.resting electrocardiographic results (values 0,1,2)
+<br>
+8.maximum heart rate achieved
+<br>
+9.exercise induced angina
+<br>
+10.oldpeak = ST depression induced by exercise relative to rest
+<br>
+11.the slope of the peak exercise ST segment
+<br>
+12.number of major vessels (0-3) colored by flourosopy
+<br>
+13.thal: 3 = normal; 6 = fixed defect; 7 = reversable defect
+<br>
+## 1. Preparing the tools
+
+# Import all the tools we need
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+# Models from Scikit-Learn
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+
+
+# Model evaluators
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import RandomizedSearchCV, GridSearchCV
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import plot_roc_curve
+## 2. Loading data 
+# Reading csv file
+df = pd.read_csv('heart-disease.csv')
+df_copy = df.copy()
+# First 5 rows of our data
+df.head()
+df.target.value_counts()
+sns.countplot(x="target", data=df, palette="Blues")
+plt.xticks(ticks=[0,1],labels =[" Haven't Heart Disease","Have Heart Disease"],rotation=0);
+
+plt.show()
+countNoDisease = len(df[df.target == 0])
+countHaveDisease = len(df[df.target == 1])
+print("Percentage of Patients Haven't Heart Disease: {:.2f}%".format((countNoDisease / (len(df.target))*100)))
+print("Percentage of Patients Have Heart Disease: {:.2f}%".format((countHaveDisease / (len(df.target))*100)))
+df.info()
+df.isna().sum()
+Our dataset does not have a missing value.
+## 3. Exploring parameters related to heart disease
+sns.countplot(x='sex', data=df, palette="mako_r")
+plt.xticks(ticks=[0,1],labels =[" Female","Male"],rotation=0);
+plt.show()
+male =len(df[df['sex'] == 1])
+female = len(df[df['sex']== 0])
+
+plt.figure(figsize=(3,3))
+
+# Data to plot
+labels = 'Male','Female'
+sizes = [male,female]
+colors = ['skyblue', 'yellowgreen']
+explode = (0,0)  # explode 1st slice
+ 
+# Plot
+plt.pie(sizes, explode=explode, labels=labels, colors=colors,
+autopct='%1.1f%%', shadow=True, startangle=90)
+ 
+plt.axis('equal')
+plt.show()
+countFemale = len(df[df.sex == 0 ])
+countMale = len(df[df.sex == 1])
+print("Percentage of Female Patients: {:.2f}%".format((countFemale / (len(df.sex))*100)))
+print("Percentage of Male Patients: {:.2f}%".format((countMale / (len(df.sex))*100)))
+### Heart Disease Frequency for Sex
+pd.crosstab(df.sex,df.target).plot(kind="bar",figsize=(15,6),color=['#8ACDEA','#0A2239' ])
+plt.title('Heart Disease Frequency for Sex')
+
+#plt.xlabel('Sex (0 = Female, 1 = Male)')
+plt.xticks(rotation=0)
+plt.legend(["Haven't Disease", "Have Disease"])
+plt.ylabel('Frequency')
+plt.xticks(ticks=[0,1],labels =[" Female","Male"],rotation=0);
+plt.show()
+
+### Heart Disease Frequency for Ages
+
+pd.crosstab(df.age,df.target).plot(kind="bar",figsize=(20,6))
+plt.title('Heart Disease Frequency for Ages')
+plt.xlabel('Age')
+plt.ylabel('Frequency')
+plt.savefig('heartDiseaseAndAges.png')
+plt.show()
+### Maximum Heart Rate By Age
+plt.figure(figsize=(10, 5))
+plt.scatter(x=df.age[df.target==1], y=df.thalach[(df.target==1)], c="red")
+plt.scatter(x=df.age[df.target==0], y=df.thalach[(df.target==0)])
+plt.legend(["Disease", "Not Disease"])
+plt.xlabel("Age")
+plt.ylabel("Maximum Heart Rate")
+plt.show()
+### Heart Disease Frequency According To FBS
+pd.crosstab(df.fbs,df.target).plot(kind="bar",figsize=(15,6),color=['#8ACDEA','#0A2239'])
+plt.title('Heart Disease Frequency According To FBS')
+plt.xlabel('FBS - (Fasting Blood Sugar > 120 mg/dl) (1 = true; 0 = false)')
+plt.xticks(rotation = 0)
+plt.legend(["Haven't Disease", "Have Disease"])
+plt.ylabel('Frequency of Disease or Not')
+plt.show()
+### Heart Disease Frequency versus Chest Pain Type
+
+pd.crosstab(df.cp, df.target)
+pd.crosstab(df.cp, df.target).plot(kind="bar",
+                                   figsize=(8,5),
+                                   color=["orange", "purple"])
+
+# Add some communication
+plt.title("Heart Disease Frequency versus Chest Pain Type")
+plt.xlabel("Chest Pain Type")
+plt.ylabel("Amount")
+
+plt.legend(["No Disease", "Disease"])
+plt.xticks(ticks=[0,1,2,3],labels =["atypical angina","typical angina"," asymptomatic "," non-anginal pain "],rotation=0);
+# correlation matrix
+df.corr()
+# plt.figure(figsize=(10, 5))
+# sns.heatmap(df.corr());
+plt.figure(figsize=(10,10))
+sns.heatmap(df.corr(),annot=True,fmt='.1f')
+plt.show()
+## 4. Modelling 
+# Splitting data into X and y
+x = df.drop("target", axis=1)
+
+y = df["target"]
+x.head()
+y
+# Split data into train and test sets
+np.random.seed(42)
+
+# Split into train & test set
+x_train, x_test, y_train, y_test = train_test_split(x,
+                                                    y,
+                                                    test_size=0.2)
+print(len(x_train))
+print(len(y_train))
+We will try 2 different classification models for this , i.e. <strong>logistic regressor</strong> and <strong>random forest classifier.</strong>
+# Put models in a dictionary
+models = {"Logistic Regression": LogisticRegression(),
+          "Random Forest": RandomForestClassifier()}
+
+# Creating a function to fit and score models
+def fit_and_score(models, x_train, x_test, y_train, y_test):
+    
+    np.random.seed(42)
+    
+    # Make a dictionary to keep model scores
+    model_scores = {}
+    
+    # Loop through models
+    for name, model in models.items():
+        
+        # Fit the model to the data
+        model.fit(x_train, y_train)
+        
+        # append the evaluated score to model_scores
+        model_scores[name] = model.score(x_test, y_test)
+    return model_scores
+model_scores = fit_and_score(models=models,x_train=x_train,x_test=x_test,y_train=y_train,
+                             y_test=y_test)
+
+model_scores
+#saving accuracies in dictionary for comparison
+accuracies = {}
+accuracies['Logistic Regression'] = 88.524
+accuracies['Random Forest'] = 83.6
+model_compare = pd.DataFrame(model_scores, index=["accuracy"])
+model_compare.T.plot.bar();
+plt.xticks(rotation=0)
+plt.show()
+#### Creating Dummy Variables <br>
+#Since 'cp', 'thal' and 'slope' are categorical variables we'll turn them into dummy variables.
+# a = pd.get_dummies(df['cp'], prefix = "cp")
+# b = pd.get_dummies(df['thal'], prefix = "thal")
+# c = pd.get_dummies(df['slope'], prefix = "slope")
+
+# frames = [df, a, b, c]
+# df = pd.concat(frames, axis = 1)
+# df.head()
+# df = df.drop(columns = ['cp', 'thal', 'slope'])
+# df.head()
+### K-Nearest Neighbors Classifier
+from sklearn.neighbors import KNeighborsClassifier
+knn = KNeighborsClassifier(n_neighbors = 2)  # n_neighbors means k
+knn.fit(x_train, y_train)
+prediction = knn.predict(x_test)
+
+print("{} NN Score: {:.2f}%".format(2, knn.score(x_test, y_test)*100))
+# try to find best k value
+scoreList = []
+for i in range(1,20):
+    knn2 = KNeighborsClassifier(n_neighbors = i)  # n_neighbors means k
+    knn2.fit(x_train, y_train)
+    scoreList.append(knn2.score(x_test, y_test))
+    
+plt.plot(range(1,20), scoreList)
+plt.xticks(np.arange(1,20,1))
+plt.xlabel("K value")
+plt.ylabel("Score")
+plt.show()
+
+acc = max(scoreList)*100
+accuracies['KNN'] = acc
+print("Maximum KNN Score is {:.2f}%".format(acc))
+### Support vector machines
+svm = SVC(random_state = 1)
+svm.fit(x_train, y_train)
+
+acc = svm.score(x_test,y_test)*100
+accuracies['SVM'] = acc
+print("Test Accuracy of SVM Algorithm: {:.2f}%".format(acc))
+### Naive Bayes Classifier
+from sklearn.naive_bayes import GaussianNB
+nb = GaussianNB()
+nb.fit(x_train, y_train)
+
+acc = nb.score(x_test,y_test)*100
+accuracies['Naive Bayes'] = acc
+print("Accuracy of Naive Bayes: {:.2f}%".format(acc))
+### Decision Tree Classifier
+from sklearn.tree import DecisionTreeClassifier
+dtc = DecisionTreeClassifier()
+dtc.fit(x_train, y_train)
+
+acc = dtc.score(x_test, y_test)*100
+accuracies['Decision Tree'] = acc
+print("Decision Tree Test Accuracy {:.2f}%".format(acc))
+## 5. Comparing between different algorithms accuracies 
+colors = ["#2E4052", "#19297C", "#585481", "#A1867F","#FFC857","#C49BBB"]
+
+sns.set_style("whitegrid")
+plt.figure(figsize=(16,5))
+plt.yticks(np.arange(0,100,10))
+plt.ylabel("Accuracy %")
+plt.xlabel("Algorithms")
+Z={k: v for k, v in sorted(accuracies.items(), key=lambda item: item[1], reverse = True)}
+sns.barplot(x=list(Z.keys()), y=list(Z.values()), palette=colors)
+plt.show()
